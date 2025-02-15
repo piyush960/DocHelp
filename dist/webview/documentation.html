@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Documentation Viewer</title>
+    <style>
+        body {
+            padding: 0;
+            margin: 0;
+            color: var(--vscode-editor-foreground);
+            background-color: var(--vscode-editor-background);
+            font-family: var(--vscode-font-family);
+        }
+        
+        .container {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        .sidebar {
+            border-right: 1px solid var(--vscode-panel-border);
+            height: 100vh;
+            overflow-y: auto;
+            padding: 20px;
+            background-color: var(--vscode-sideBar-background);
+        }
+        
+        .search-container {
+            position: sticky;
+            top: 0;
+            background-color: var(--vscode-sideBar-background);
+            padding-bottom: 10px;
+            z-index: 10;
+        }
+        
+        .search-box {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            background: var(--vscode-input-background);
+            color: var(--vscode-input-foreground);
+            border: 1px solid var(--vscode-input-border);
+            border-radius: 2px;
+        }
+        
+        .navigation {
+            padding-top: 10px;
+        }
+        
+        .nav-item {
+            padding: 8px;
+            margin: 2px 0;
+            cursor: pointer;
+            border-radius: 3px;
+            color: var(--vscode-sideBarTitle-foreground);
+            text-overflow: ellipsis;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+        
+        .nav-item:hover {
+            background-color: var(--vscode-list-hoverBackground);
+            color: var(--vscode-list-hoverForeground);
+        }
+        
+        .nav-item.active {
+            background-color: var(--vscode-list-activeSelectionBackground);
+            color: var(--vscode-list-activeSelectionForeground);
+        }
+        
+        .main-content {
+            height: 100vh;
+            overflow-y: auto;
+            padding: 20px 40px;
+        }
+        
+        .content img {
+            max-width: 100%;
+            height: auto;
+        }
+        
+        pre {
+            background-color: var(--vscode-textCodeBlock-background);
+            padding: 16px;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 16px 0;
+        }
+        
+        code {
+            font-family: var(--vscode-editor-font-family);
+            font-size: var(--vscode-editor-font-size);
+        }
+        
+        /* Loading indicator */
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            font-style: italic;
+            color: var(--vscode-descriptionForeground);
+        }
+        
+        .loading.visible {
+            display: block;
+        }
+
+        .top-bar {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            align-items: center;
+            padding: 10px 20px;
+            display: flex;
+            gap: 8px;
+            background-color: var(--vscode-editor-background);
+            border-bottom: 1px solid var(--vscode-panel-border);
+        }
+        
+        .top-search {
+            width: 300px;
+            padding: 8px;
+            background: var(--vscode-input-background);
+            color: var(--vscode-input-foreground);
+            border: 1px solid var(--vscode-input-border);
+            border-radius: 2px;
+        }
+
+        .chatbot-panel {
+            border-top: 1px solid var(--vscode-panel-border);
+            border-right: 1px solid var(--vscode-panel-border);
+            background-color: var(--vscode-sideBar-background);
+            display: flex;
+            flex-direction: column;
+            padding: 10px;
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            max-width: 500px;
+            max-height: 80vh;
+            height: auto;
+            overflow-y: auto;
+            box-shadow: 0 2px 6px var(--vscode-widget-shadow);
+            border-radius: 8px;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+
+        .chat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: bold;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--vscode-panel-border);
+            color: var(--vscode-sideBarTitle-foreground);
+        }
+
+        .close-button {
+            cursor: pointer;
+            background: none;
+            border: none;
+            font-size: 16px;
+            color: var(--vscode-editor-foreground);
+            transition: color 0.2s ease;
+        }
+
+        .close-button:hover {
+            color: var(--vscode-textLink-activeForeground);
+        }
+
+        .chat-toggle {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+            padding: 10px 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 2px 4px var(--vscode-widget-shadow);
+            transition: background 0.2s ease;
+        }
+
+        .chat-toggle:hover {
+            background: var(--vscode-button-hoverBackground);
+        }
+
+
+        .chat-messages {
+            flex-grow: 1;
+            overflow-y: auto;
+            margin-bottom: 10px;
+            padding: 10px;
+            background: var(--vscode-input-background);
+            border-radius: 4px;
+        }
+
+        .chat-input-container {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .chat-input {
+            flex-grow: 1;
+            padding: 8px;
+            background: var(--vscode-input-background);
+            color: var(--vscode-input-foreground);
+            border: 1px solid var(--vscode-input-border);
+            border-radius: 2px;
+        }
+        
+        .topSearch-send , .chat-send {
+            padding: 8px 16px;
+            background: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+            border: none;
+            border-radius: 2px;
+            cursor: pointer;
+        }
+
+        .chat-send:hover {
+            background: var(--vscode-button-hoverBackground);
+        }
+        
+        .chat-message {
+            margin: 8px 0;
+            padding: 8px;
+            border-radius: 4px;
+            background: var(--vscode-editor-background);
+        }
+
+
+        /* Hidden state */
+        .hidden {
+            opacity: 0;
+            transform: translateY(10px);
+            pointer-events: none;
+        }
+
+        .recommendation-panel {
+            width: 100%;
+            max-width: 280px;
+            background-color: var(--vscode-editorWidget-background);
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            padding: 12px;
+            border-radius: 8px;
+            box-shadow: 0 2px 6px var(--vscode-widget-shadow);
+            border: 1px solid var(--vscode-panel-border);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+
+        .recommendation-title {
+            font-size: 14px;
+            font-weight: bold;
+            color: var(--vscode-sideBarTitle-foreground);
+            margin-bottom: 8px;
+            border-bottom: 1px solid var(--vscode-panel-border);
+            padding-bottom: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .close-button {
+            cursor: pointer;
+            background: none;
+            border: none;
+            font-size: 16px;
+            color: var(--vscode-editor-foreground);
+            transition: color 0.2s ease;
+        }
+
+        .close-button:hover {
+            color: var(--vscode-textLink-activeForeground);
+        }
+
+        .recommendation-item {
+            padding: 8px;
+            border-radius: 4px;
+            background: var(--vscode-input-background);
+            color: var(--vscode-input-foreground);
+            border: 1px solid var(--vscode-input-border);
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            transition: background 0.2s;
+        }
+
+        .recommendation-item:hover {
+            background: var(--vscode-list-hoverBackground);
+        }
+
+        .recommendation-item a {
+            color: var(--vscode-textLink-foreground);
+            text-decoration: none;
+            font-size: 13px;
+            word-break: break-word;
+        }
+
+        .recommendation-item a:hover {
+            text-decoration: underline;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="top-bar">
+            <input type="text" class="top-search" placeholder="Intelligent search...">
+            <button class="topSearch-send">Search</button>
+        </div>
+        <div class="sidebar">
+            <div class="search-container">
+                <input type="text" class="search-box" placeholder="Search documentation...">
+            </div>
+            <div id="navigation" class="navigation"></div>
+            <div class="recommendation-panel hidden" id="recommendation-panel">
+                <div class="recommendation-title">
+                    Recommended Links
+                    <button class="close-button" id="close-recommendations">X</button>
+                </div>
+                <div id="recommendation-links"> 
+                    
+                </div>
+            </div>
+        </div>
+        <!-- Chatbot Panel -->
+        <div class="chatbot-panel" id="chatbot-panel">
+            <div class="chat-header">
+                Chatbot
+                <button class="close-button" id="close-chatbot">X</button>
+            </div>
+            <div id="chat-messages" class="chat-messages"></div>
+            <div class="chat-input-container">
+                <input type="text" class="chat-input" placeholder="Ask a question...">
+                <button class="chat-send">Send</button>
+            </div>
+        </div>
+
+        <!-- Chatbot Toggle Button -->
+        <button id="toggle-chatbot" class="chat-toggle hidden">💬 Chatbot</button>
+
+        
+        <div class="main-content">
+            <div id="top-reference"></div>
+            <div id="content" class="content"></div>
+            <div id="loading" class="loading">Loading...</div>
+        </div>
+    </div>
+    <script>
+    const vscode = acquireVsCodeApi();
+    let currentUrl = '';
+    const chatbotPanel = document.getElementById('chatbot-panel');
+    const toggleChatbotButton = document.getElementById('toggle-chatbot');
+    const closeChatbotButton = document.getElementById('close-chatbot');
+    
+    document.querySelector('.top-search').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            searchSubmit();
+        }
+    });
+
+    document.querySelector('.topSearch-send').addEventListener('click', () => {
+        searchSubmit();
+    });
+
+    function searchSubmit() {
+        const searchBox = document.querySelector('.top-search');
+        const query = searchBox.value.trim();
+        if (query) {
+            vscode.postMessage({
+                command: 'search',
+                text: query
+            });
+        }
+        chatbotPanel.classList.remove('hidden');
+        toggleChatbotButton.classList.add('hidden');
+    }
+    
+    // Debounce function
+    function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+    
+    // Handle all link clicks within the content
+    document.getElementById('content').addEventListener('click', (e) => {
+        if (e.target.tagName === 'A') {
+            e.preventDefault();
+            const href = e.target.getAttribute('href');
+            if (href) {
+                vscode.postMessage({
+                    command: 'navigate',
+                    url: href
+                });
+            }
+        }
+    });
+    
+    // Handle navigation clicks
+    document.getElementById('navigation').addEventListener('click', (e) => {
+    const navItem = e.target.closest('.nav-item');
+
+    if (navItem) {
+        let url = navItem.dataset.href;
+        const [ urlWithoutHash, hash ] = url.split("#");
+
+        if (url.includes("#") && (currentUrl == urlWithoutHash)) { 
+            const element = document.getElementById(hash); 
+            if (element) {
+                element.scrollIntoView({ behavior: "smooth" });
+                document.querySelecto>rAll(".nav-item").forEach((item) => {
+                    item.classList.remove("active");
+                });
+                navItem.classList.add("active");
+            }
+        }
+        else if (url) {
+            document.querySelectorAll(".nav-item").forEach((item) => {
+                item.classList.remove("active");
+            });
+            navItem.classList.add("active");
+            currentUrl = url;
+            // Navigate to the URL
+            vscode.postMessage({
+                command: "navigate",
+                url: url,
+            });
+        }
+    }
+    });
+
+    const chatInput = document.querySelector('.chat-input');
+    const chatSendButton = document.querySelector('.chat-send');
+    const chatMessages = document.getElementById('chat-messages');
+    
+    // Close chatbot
+    closeChatbotButton.addEventListener('click', function() {
+        chatbotPanel.classList.add('hidden');
+        setTimeout(() => toggleChatbotButton.classList.remove('hidden'), 300); // Delay to smooth transition
+    });
+
+    // Toggle chatbot panel when clicking button
+    toggleChatbotButton.addEventListener('click', function() {
+        chatbotPanel.classList.remove('hidden');
+        toggleChatbotButton.classList.add('hidden');
+    });
+
+
+    // Function to send chat message
+    function sendChatMessage() {
+        const message = chatInput.value.trim();
+        if (message) {
+            vscode.postMessage({
+                command: 'chatMessage',
+                text: message
+            });
+            chatInput.value = '';
+        }
+    }
+
+    // Send button click handler
+    chatSendButton.addEventListener('click', sendChatMessage);
+
+    // Enter key handler
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendChatMessage();
+            }
+    });
+
+
+    // Handle messages from extension
+    window.addEventListener('message', event => {
+        const message = event.data;
+        switch (message.command) {
+            case 'addChatMessage':
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'chat-message';
+                const role = message.message.role === 'user' ? 'You' : 'Bot';
+                
+                // Handle code blocks in the response
+                let content = message.message.content;
+                messageDiv.innerHTML = `<strong>${role}:</strong> ${content}`;
+                chatMessages.appendChild(messageDiv);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+                break;
+                    
+            case 'updateContent':
+                document.getElementById('content').innerHTML = message.content;
+                document.getElementById('loading').classList.remove('visible');
+                
+                // Handle any hash in the URL after content update
+                const hash = currentUrl.split('#')[1];
+
+                if (hash) {
+                    setTimeout(() => {
+                        const element = document.getElementById(hash);
+                        if (element) {
+                            element.scrollIntoView({ behavior: 'smooth' });
+                        }
+                    }, 500);
+                }
+                else{
+                    const element = document.getElementById('top-reference');
+                    element?.scrollIntoView({ behavior: 'smooth' });
+                }
+                break;
+                
+            case 'updateNavigation':
+                const nav = document.getElementById('navigation');
+                nav.innerHTML = message.items
+                    .map(item => {
+                        const isActive = item.href === currentUrl ? 'active' : '';
+                        return `<div class="nav-item ${isActive}" data-href="${item.href}" title="${item.href}">${item.text}</div>`;
+                    })
+                    .join('');
+                break;
+            case 'intializeURL':
+                currentUrl = message.url;
+                break;
+            case 'showLoading':
+                document.getElementById('loading').classList.add('visible');
+                break;
+            case 'addRecommendation':
+                let recommendedItems = '';
+                message.message.forEach((item)=>{
+                recommendedItems += `
+                <div class="recommendation-item">
+                    <strong>${item[1]}</strong>
+                    <a href="${item[2]}" target="_blank">${item[2]}</a>
+                    </div>`
+                });
+                document.getElementById('recommendation-links').innerHTML = recommendedItems;
+                document.getElementById('recommendation-panel').classList.remove('hidden');
+                break;
+        }
+    });
+
+    document.getElementById('close-recommendations').addEventListener('click', function() {
+        document.getElementById('recommendation-panel').classList.add('hidden');
+    });
+
+    function clearHighlights(element) {
+        const highlightedSpans = element.querySelectorAll('span');
+        highlightedSpans.forEach(span => {
+            const textNode = document.createTextNode(span.textContent);
+            span.replaceWith(textNode);
+        });
+    }
+
+    function highlightText(query) {
+        if (!query) return;
+
+        const contentDiv = document.querySelector('.content'); // Adjust selector if needed
+        if (!contentDiv) return;
+
+        clearHighlights(contentDiv);
+
+        const textNodes = getTextNodes(contentDiv);
+        textNodes.forEach(node => {
+            const regex = new RegExp(query, 'gi');
+            const matches = [...node.textContent.matchAll(regex)];
+
+            let offset = 0;
+            matches.forEach(match => {
+                const span = document.createElement('span');
+                span.textContent = match[0];
+                span.style.backgroundColor = 'yellow';
+                span.style.borderRadius = '3px';
+                span.style.padding = '2px';
+
+                const range = document.createRange();
+                range.setStart(node, match.index + offset);
+                range.setEnd(node, match.index + match[0].length + offset);
+                range.deleteContents();
+                range.insertNode(span);
+
+                offset += span.outerHTML.length - match[0].length;
+            });
+        });
+    }
+    
+    // Initial state setup
+    document.getElementById('loading').classList.add('visible');
+</script>
+</body>
+</html>
