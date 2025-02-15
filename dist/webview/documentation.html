@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Documentation Viewer</title>
+    <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.5.0/themes/prism.min.css"
+    />
     <style>
         body {
             padding: 0;
@@ -244,6 +248,8 @@
         .recommendation-panel {
             width: 100%;
             max-width: 280px;
+            max-height: 400px;
+            overflow-y: auto;
             background-color: var(--vscode-editorWidget-background);
             position: absolute;
             bottom: 10px;
@@ -328,9 +334,9 @@
                     Recommended Links
                     <button class="close-button" id="close-recommendations">X</button>
                 </div>
-                <div id="recommendation-links"> 
-                    
-                </div>
+                <div id="recommendation-links"></div>
+                <div class="recommendation-title">Forums</div>
+                <div id="forums_links"></div>
             </div>
         </div>
         <!-- Chatbot Panel -->
@@ -542,14 +548,23 @@
                 break;
             case 'addRecommendation':
                 let recommendedItems = '';
-                message.message.forEach((item)=>{
+                message.message.recommended_links.forEach((item)=>{
                 recommendedItems += `
                 <div class="recommendation-item">
                     <strong>${item[1]}</strong>
                     <a href="${item[2]}" target="_blank">${item[2]}</a>
                     </div>`
                 });
+                let forumItems = '';
+                message.message.forums.forEach((item)=>{
+                forumItems += `
+                <div class="recommendation-item">
+                    <strong>${item.title}</strong>
+                    <a href="${item.url}" target="_blank">${item.url}</a>
+                    </div>`
+                });
                 document.getElementById('recommendation-links').innerHTML = recommendedItems;
+                document.getElementById('forums_links').innerHTML = forumItems;
                 document.getElementById('recommendation-panel').classList.remove('hidden');
                 break;
         }
@@ -602,5 +617,7 @@
     // Initial state setup
     document.getElementById('loading').classList.add('visible');
 </script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.5.0/prism.min.js"></script>
+
 </body>
 </html>

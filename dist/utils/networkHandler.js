@@ -72,7 +72,7 @@ class NetworkHandler {
             // Process code blocks
             $('pre code').each((_, elem) => {
                 const language = $(elem).attr('class')?.replace('language-', '') || 'text';
-                $(elem).parent().addClass(`language-java`);
+                $(elem).parent().addClass(`language-python`);
             });
             // Add IDs to headings if they don't have them
             $('h1, h2, h3, h4, h5, h6').each((_, elem) => {
@@ -99,9 +99,7 @@ class NetworkHandler {
                     $(el).attr('src', new URL(src, baseUrl).toString());
                 }
             });
-            let content = $('.content, article, main').length
-                ? $('.content, article, main').html()?.trim() || ''
-                : $('body').html()?.trim() || '';
+            let content = $('body').html()?.trim();
             const links = $('a[href]')
                 .map((_, el) => {
                 const href = $(el).attr('href') || '';
@@ -126,8 +124,15 @@ class NetworkHandler {
             })
                 .filter((value, index, self) => {
                 // Filter out links with empty or invalid text and duplicates
-                const isValidText = value.text && value.text.length > 1;
-                const isDuplicate = self.findIndex(link => link.text === value.text) !== index;
+                let isValidText = '';
+                if (value.text.length == 1) {
+                    isValidText = value.href.split("#")[1];
+                    value.text = isValidText;
+                }
+                else if (value.text.length > 1) {
+                    isValidText = value.text;
+                }
+                const isDuplicate = self.findIndex(link => link.href === value.href) !== index;
                 return isValidText && !isDuplicate;
             });
             //push to linksTuples (text , url) , no duplicate

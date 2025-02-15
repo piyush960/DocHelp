@@ -101,6 +101,7 @@ class DocumentationManager {
         }
         const context = `${searchResult.data.text} \n\ngive appropriate response from your side. \n\nThe document is available at: ${searchResult.data.best_match}`;
         await this.navigate(searchResult.data.best_match);
+        const forums = await this.fetchForumsResults(query);
         const chatbot_response = await this.geminiService.generateResponse(query, context);
         this.panel?.postMessage({
             command: 'addChatMessage',
@@ -111,9 +112,38 @@ class DocumentationManager {
         });
         this.panel?.postMessage({
             command: 'addRecommendation',
-            message: searchResult.data.recommended_links,
+            message: { recommended_links: searchResult.data.recommended_links, forums: forums.data }
         });
         return searchResult;
+    }
+    getDomainName(url) {
+        let hostname = new URL(url).hostname;
+        return hostname.replace(/^www\./, '');
+    }
+    async fetchForumsResults(query) {
+        const options = {
+            method: 'GET',
+            url: 'https://real-time-forums-search.p.rapidapi.com/search',
+            params: {
+                query: query + ` in ${this.getDomainName(this.baseUrl)}`,
+                time: 'any',
+                start: '0',
+                country: 'us',
+                language: 'en'
+            },
+            headers: {
+                'x-rapidapi-key': '1dc3581a84mshdcf979fd41a22a8p1bcc2ajsnd841021890c1',
+                'x-rapidapi-host': 'real-time-forums-search.p.rapidapi.com'
+            }
+        };
+        try {
+            const response = await axios_1.default.request(options);
+            return response.data;
+        }
+        catch (error) {
+            console.error(error);
+        }
+        return [];
     }
 }
 exports.DocumentationManager = DocumentationManager;
