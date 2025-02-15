@@ -202,7 +202,7 @@ export function activate(context: vscode.ExtensionContext) {
         async (url: string) => {
             await docManager.navigate(url);
         }
-    );    
+    );
 
     context.subscriptions.push(loadDocsCommand, searchCommand, navigateCommand);
 }

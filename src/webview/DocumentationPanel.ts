@@ -1,24 +1,29 @@
 import * as vscode from 'vscode';
+import { ChatHandler } from '../utils/chatHandler';
 
 export class DocumentationPanel {
     public static currentPanel: DocumentationPanel | undefined;
-    private readonly _panel: vscode.WebviewPanel;
+    private  _panel: vscode.WebviewPanel;
     private _disposables: vscode.Disposable[] = [];
+    private chatHandler: ChatHandler;
 
     private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
         this._panel = panel;
         this._panel.webview.html = this._getWebviewContent(this._panel.webview, extensionUri);
         this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
-        
+        this.chatHandler = new ChatHandler();
+
         this._panel.webview.onDidReceiveMessage(
             message => {
-                console.log(message);
                 switch (message.command) {
                     case 'search':
                         vscode.commands.executeCommand('documentation-viewer.search', message.text);
                         return;
                     case 'navigate':
                         vscode.commands.executeCommand('documentation-viewer.navigate', message.url);
+                        return;
+                    case 'chatMessage':
+                        this.chatHandler.handleMessage(message.text, this);
                         return;
                 }
             },
@@ -60,6 +65,8 @@ export class DocumentationPanel {
             command: 'updateContent', 
             content 
         });
+        // Update chat context when content changes
+        this.chatHandler.updateContext(content);
     }
 
     public postMessage(message: any) {
@@ -209,7 +216,8 @@ export class DocumentationPanel {
                     padding: 10px;
                     position: absolute;
                     bottom: 10px;
-                    right: 10px
+                    right: 10px;
+                    max-width: 500px;
                 }
                 
                 .chat-messages {
@@ -270,10 +278,7 @@ export class DocumentationPanel {
                 </div>
                 <div class="chatbot-panel">
                     <div id="chat-messages" class="chat-messages">
-                        <div class="chat-message">Bot: Hello, How can I help you?</div>
-                        <div class="chat-message">User: how to start flask app?</div>
-                        <div class="chat-message">Bot: You can start a Flask app using the following command: <br /><pre>flask --app hello run --debug</pre> This will start your Flask app in debug mode, allowing see real-time changes.
-                        </div>
+                        
                     </div>
                     <div class="chat-input-container">
                         <input type="text" class="chat-input" placeholder="Ask a question...">
@@ -348,10 +353,49 @@ export class DocumentationPanel {
                 }
             });
 
+            const chatInput = document.querySelector('.chat-input');
+            const chatSendButton = document.querySelector('.chat-send');
+            const chatMessages = document.getElementById('chat-messages');
+
+            // Function to send chat message
+            function sendChatMessage() {
+                const message = chatInput.value.trim();
+                if (message) {
+                    vscode.postMessage({
+                        command: 'chatMessage',
+                        text: message
+                    });
+                    chatInput.value = '';
+                }
+            }
+
+            // Send button click handler
+            chatSendButton.addEventListener('click', sendChatMessage);
+
+            // Enter key handler
+                chatInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        sendChatMessage();
+                    }
+            });
+
+
             // Handle messages from extension
             window.addEventListener('message', event => {
                 const message = event.data;
                 switch (message.command) {
+                    case 'addChatMessage':
+                        const messageDiv = document.createElement('div');
+                        messageDiv.className = 'chat-message';
+                        const role = message.message.role === 'user' ? 'You' : 'Bot';
+                        
+                        // Handle code blocks in the response
+                        let content = message.message.content;
+                        messageDiv.innerHTML = \`<strong>\${role}:</strong> \${content}\`;
+                        chatMessages.appendChild(messageDiv);
+                        chatMessages.scrollTop = chatMessages.scrollHeight;
+                        break;
                     case 'updateContent':
                         document.getElementById('content').innerHTML = message.content;
                         document.getElementById('loading').classList.remove('visible');
