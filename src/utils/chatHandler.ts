@@ -25,15 +25,15 @@ export class ChatHandler {
             });
 
             // Generate response using Gemini
-            const response = await this.geminiService.generateResponse(message, this.currentContext);
-            const formattedResponse = response.replace(/```([\s\S]*?)```/g, '<pre>$1</pre>');
+            const response = await this.geminiService.generateResponse(message);
+            // const formattedResponse = response.replace(/```([\s\S]*?)```/g, '<pre>$1</pre>');
 
             // Add bot response to chat
             panel.postMessage({
                 command: 'addChatMessage',
                 message: {
                     role: 'assistant',
-                    content: formattedResponse
+                    content: response
                 }
             });
         } catch (error) {

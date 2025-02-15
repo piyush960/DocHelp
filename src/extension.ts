@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { DocumentationPanel } from './webview/DocumentationPanel';
 import { NetworkHandler, DocPage } from './utils/networkHandler';
 import axios from 'axios';
+import { GeminiService } from './utils/geminiServices';
 
 
 export class DocumentationManager {
@@ -11,9 +12,11 @@ export class DocumentationManager {
     private networkHandler: NetworkHandler;
     private fetchQueue: Set<string> = new Set();
     private processingQueue: boolean = false;
+    private geminiService: GeminiService;
 
     constructor(private context: vscode.ExtensionContext) {
         this.networkHandler = NetworkHandler.getInstance();
+        this.geminiService =  GeminiService.getInstance();
     }
 
     async initialize(documentationUrl: string) {
@@ -23,12 +26,15 @@ export class DocumentationManager {
             
             if (mainPage) {
                 this.pages.set(documentationUrl, mainPage);
-                console.log(mainPage)
                 this.panel = DocumentationPanel.createOrShow(this.context.extensionUri);
                 this.panel.updateContent(mainPage.content);
                 this.panel.postMessage({
                     command: 'updateNavigation',
                     items: mainPage.links
+                });
+                this.panel.postMessage({
+                    commands: 'intializeURL',
+                    url: documentationUrl
                 });
 
                 // Queue linked pages for background processing
@@ -105,85 +111,30 @@ export class DocumentationManager {
 
         const searchResult = await axios.post('https://5654-103-81-39-74.ngrok-free.app/intelligent-search',{links : this.networkHandler.getLink(),query : query});
         
-        if (this.panel) {
-            const searchContent = this.renderSearchResults(searchResult);
-            this.panel.updateContent(searchContent);
+        if (!(searchResult.status == 200)){
+            vscode.window.showErrorMessage('Error From Backend');
+            return;
         }
+        const context = `${searchResult.data.text} \n\ngive appropriate response from your side. \n\nThe document is available at: ${searchResult.data.best_match}`;
+        
+        await this.navigate(searchResult.data.best_match);
+        const chatbot_response = await this.geminiService.generateResponse(query, context);
 
+        
+        this.panel?.postMessage({
+            command: 'addChatMessage',
+            message: {
+                role: 'assistant',
+                content: chatbot_response
+            }
+        });
+
+        this.panel?.postMessage({
+            command: 'addRecommendation',
+            message: searchResult.data.recommended_links,
+        });
+        
         return searchResult;
-    }
-
-
-    private renderSearchResults(results: any): string {
-    
-        return `
-            <div class="search-results">
-                <h2>Search Results</h2>
-                ${results.data.text}
-            </div>
-            <style>
-                .search-result {
-                    padding: 16px;
-                    margin: 16px 0;
-                    border: 1px solid var(--vscode-panel-border);
-                    border-radius: 4px;
-                    background: var(--vscode-editor-background);
-                }
-
-                .search-result h3 {
-                    margin: 0 0 8px 0;
-                }
-
-                .search-result-link {
-                    color: var(--vscode-textLink-foreground);
-                    text-decoration: none;
-                }
-
-                .search-result-link:hover {
-                    color: var(--vscode-textLink-activeForeground);
-                    text-decoration: underline;
-                }
-
-                .relevance {
-                    font-size: 0.9em;
-                    color: var(--vscode-descriptionForeground);
-                    margin-bottom: 8px;
-                }
-
-                .preview {
-                    color: var(--vscode-foreground);
-                    font-size: 0.95em;
-                    line-height: 1.4;
-                }
-            </style>
-            <script>
-                document.addEventListener('click', (e) => {
-                const target = e.target as HTMLElement;
-                const searchResultLink = target.closest('.search-result-link');
-                
-                if (searchResultLink instanceof HTMLAnchorElement) {
-                    e.preventDefault();
-                    const href = searchResultLink.getAttribute('href');
-                    if (href) {
-                        vscode.postMessage({
-                            command: 'navigate',
-                            url: href
-                        });
-                        
-                        // Update current URL and active state in navigation
-                        currentUrl = href;
-                        document.querySelectorAll('.nav-item').forEach(item => {
-                            item.classList.remove('active');
-                            if (item instanceof HTMLElement && item.dataset.href === href) {
-                                item.classList.add('active');
-                            }
-                        });
-                    }
-                }
-            });
-            </script>
-
-        `;
     }
 }
 
@@ -209,13 +160,9 @@ export function activate(context: vscode.ExtensionContext) {
     // Register search command
     let searchCommand = vscode.commands.registerCommand(
         'documentation-viewer.search',
-        async () => {
-            const query = await vscode.window.showInputBox({
-                prompt: 'Search documentation'
-            });
-
-            if (query) {
-                await docManager.search(query);
+        async (text:string) => {
+            if (text) {
+                await docManager.search(text);
             }
         }
     );
