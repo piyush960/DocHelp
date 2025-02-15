@@ -23,6 +23,7 @@ export interface DocPage {
 export class NetworkHandler {
     private static instance: NetworkHandler;
     private agent: https.Agent;
+    private linksTuples: Array<[string, string]>;
     
     private constructor() {
         this.agent = new https.Agent({
@@ -32,6 +33,7 @@ export class NetworkHandler {
             timeout: 10000,
             rejectUnauthorized: false
         });
+        this.linksTuples = [];
     }
 
     static getInstance(): NetworkHandler {
@@ -87,6 +89,8 @@ export class NetworkHandler {
 
         throw new Error(`Failed after ${maxRetries} attempts. Last error: ${lastError?.message}`);
     }
+
+
 
     async fetchAndProcessPage(url: string): Promise<DocPage | null> {
         try {
@@ -161,18 +165,26 @@ export class NetworkHandler {
                     const isDuplicate = self.findIndex(link => link.text === value.text) !== index;
                     return isValidText && !isDuplicate;
                 });
+                //push to linksTuples (text , url) , no duplicate
+                links.forEach(link => {
+                    const tuple: [string, string] = [link.text, link.href];
+                
+                    if (!this.linksTuples.some(([t, h]) => t === tuple[0] && h === tuple[1])) {
+                        this.linksTuples.push(tuple);
+                    }
+                });
 
             // If there's a hash in the URL, add a script to scroll to it
-            if (hash) {
-                content = `${content}<script>
-                    setTimeout(() => {
-                        const element = document.getElementById('${hash}');
-                        if (element) {
-                            element.scrollIntoView({ behavior: 'smooth' });
-                        }
-                    }, 10000);
-                </script>`;
-            }
+            // if (hash) {
+            //     content = `${content}<script>
+            //         setTimeout(() => {
+            //             const element = document.getElementById('${hash}');
+            //             if (element) {
+            //                 element.scrollIntoView({ behavior: 'smooth' });
+            //             }
+            //         }, 2000);
+            //     </script>`;
+            // }
 
             return {
                 url,
@@ -184,5 +196,9 @@ export class NetworkHandler {
             vscode.window.showErrorMessage(`Failed to fetch page ${url}: ${error}`);
             return null;
         }
+    }
+
+    public getLink = ()=>{
+        return this.linksTuples;
     }
 }

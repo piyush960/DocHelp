@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { DocumentationPanel } from './webview/DocumentationPanel';
 import { NetworkHandler, DocPage } from './utils/networkHandler';
+import axios from 'axios';
 
 
 export class DocumentationManager {
@@ -100,79 +101,25 @@ export class DocumentationManager {
         }
     }
 
-    async search(query: string): Promise<Array<{
-        page: DocPage,
-        relevance: number
-    }>> {
-        const results = Array.from(this.pages.values())
-            .map(page => ({
-                page,
-                relevance: this.calculateRelevance(page, query)
-            }))
-            .filter(result => result.relevance > 0)
-            .sort((a, b) => b.relevance - a.relevance);
+    async search(query: string){
 
+        const searchResult = await axios.post('https://5654-103-81-39-74.ngrok-free.app/intelligent-search',{links : this.networkHandler.getLink(),query : query});
+        
         if (this.panel) {
-            const searchContent = this.renderSearchResults(results);
+            const searchContent = this.renderSearchResults(searchResult);
             this.panel.updateContent(searchContent);
         }
 
-        return results;
+        return searchResult;
     }
 
-    private calculateRelevance(page: DocPage, query: string): number {
-        const searchTerms = query.toLowerCase().split(' ');
-        let score = 0;
 
-        const titleLower = page.title.toLowerCase();
-        const contentLower = page.content.toLowerCase();
-
-        searchTerms.forEach(term => {
-            // Title matches weighted higher
-            if (titleLower.includes(term)) {
-                score += 10;
-            }
-            
-            // Content matches
-            const contentMatches = contentLower.split(term).length - 1;
-            score += contentMatches;
-            
-            // URL relevance
-            if (page.url.toLowerCase().includes(term)) {
-                score += 5;
-            }
-        });
-
-        return score;
-    }
-
-    private renderSearchResults(results: Array<{page: DocPage, relevance: number}>): string {
-        // Remove duplicates based on URL
-        const uniqueResults = results.reduce((acc, curr) => {
-            if (!acc.find(item => item.page.url === curr.page.url)) {
-                acc.push(curr);
-            }
-            return acc;
-        }, [] as typeof results);
+    private renderSearchResults(results: any): string {
     
         return `
             <div class="search-results">
                 <h2>Search Results</h2>
-                ${uniqueResults.map(({page, relevance}) => `
-                    <div class="search-result">
-                        <h3>
-                            <a href="${page.url}" class="search-result-link">
-                                ${page.title}
-                            </a>
-                        </h3>
-                        <div class="relevance">Match Score: ${relevance}</div>
-                        <div class="preview">
-                            ${page.content
-                                .replace(/<[^>]*>/g, '') // Remove HTML tags
-                                .substring(0, 200)}...
-                        </div>
-                    </div>
-                `).join('')}
+                ${results.data.text}
             </div>
             <style>
                 .search-result {
