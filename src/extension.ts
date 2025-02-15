@@ -147,19 +147,95 @@ export class DocumentationManager {
     }
 
     private renderSearchResults(results: Array<{page: DocPage, relevance: number}>): string {
+        // Remove duplicates based on URL
+        const uniqueResults = results.reduce((acc, curr) => {
+            if (!acc.find(item => item.page.url === curr.page.url)) {
+                acc.push(curr);
+            }
+            return acc;
+        }, [] as typeof results);
+    
         return `
             <div class="search-results">
                 <h2>Search Results</h2>
-                ${results.map(({page, relevance}) => `
-                    <div class="search-result" data-url="${page.url}">
-                        <h3>${page.title}</h3>
-                        <div class="relevance">Relevance: ${relevance}</div>
+                ${uniqueResults.map(({page, relevance}) => `
+                    <div class="search-result">
+                        <h3>
+                            <a href="${page.url}" class="search-result-link">
+                                ${page.title}
+                            </a>
+                        </h3>
+                        <div class="relevance">Match Score: ${relevance}</div>
                         <div class="preview">
-                            ${page.content.substring(0, 200)}...
+                            ${page.content
+                                .replace(/<[^>]*>/g, '') // Remove HTML tags
+                                .substring(0, 200)}...
                         </div>
                     </div>
                 `).join('')}
             </div>
+            <style>
+                .search-result {
+                    padding: 16px;
+                    margin: 16px 0;
+                    border: 1px solid var(--vscode-panel-border);
+                    border-radius: 4px;
+                    background: var(--vscode-editor-background);
+                }
+
+                .search-result h3 {
+                    margin: 0 0 8px 0;
+                }
+
+                .search-result-link {
+                    color: var(--vscode-textLink-foreground);
+                    text-decoration: none;
+                }
+
+                .search-result-link:hover {
+                    color: var(--vscode-textLink-activeForeground);
+                    text-decoration: underline;
+                }
+
+                .relevance {
+                    font-size: 0.9em;
+                    color: var(--vscode-descriptionForeground);
+                    margin-bottom: 8px;
+                }
+
+                .preview {
+                    color: var(--vscode-foreground);
+                    font-size: 0.95em;
+                    line-height: 1.4;
+                }
+            </style>
+            <script>
+                document.addEventListener('click', (e) => {
+                const target = e.target as HTMLElement;
+                const searchResultLink = target.closest('.search-result-link');
+                
+                if (searchResultLink instanceof HTMLAnchorElement) {
+                    e.preventDefault();
+                    const href = searchResultLink.getAttribute('href');
+                    if (href) {
+                        vscode.postMessage({
+                            command: 'navigate',
+                            url: href
+                        });
+                        
+                        // Update current URL and active state in navigation
+                        currentUrl = href;
+                        document.querySelectorAll('.nav-item').forEach(item => {
+                            item.classList.remove('active');
+                            if (item instanceof HTMLElement && item.dataset.href === href) {
+                                item.classList.add('active');
+                            }
+                        });
+                    }
+                }
+            });
+            </script>
+
         `;
     }
 }

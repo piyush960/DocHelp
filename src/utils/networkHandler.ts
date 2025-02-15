@@ -154,6 +154,12 @@ export class NetworkHandler {
                     } catch {
                         return false;
                     }
+                })
+                .filter((value, index, self) => {
+                    // Filter out links with empty or invalid text and duplicates
+                    const isValidText = value.text && value.text.length > 1;
+                    const isDuplicate = self.findIndex(link => link.text === value.text) !== index;
+                    return isValidText && !isDuplicate;
                 });
 
             // If there's a hash in the URL, add a script to scroll to it
@@ -164,7 +170,7 @@ export class NetworkHandler {
                         if (element) {
                             element.scrollIntoView({ behavior: 'smooth' });
                         }
-                    }, 100);
+                    }, 10000);
                 </script>`;
             }
 
