@@ -1,1 +1,6 @@
-node_modules/
+venv
+node_modules
+.vscode
+faiss_metadata.index
+faiss_content.index
+documentation.db
