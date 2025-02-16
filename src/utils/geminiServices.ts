@@ -7,7 +7,7 @@ export class GeminiService {
     private model: any;
     
     private constructor() {
-        const apiKey = 'AIzaSyD7trGWUVbUenovDppaQbEbma8jPUmylqI';
+        const apiKey = 'GEMINI_API_KEY';
         if (!apiKey) {
             throw new Error('Gemini API key not configured');
         }

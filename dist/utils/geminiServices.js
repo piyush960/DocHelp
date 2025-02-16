@@ -4,7 +4,7 @@ exports.GeminiService = void 0;
 const generative_ai_1 = require("@google/generative-ai");
 class GeminiService {
     constructor() {
-        const apiKey = 'AIzaSyD7trGWUVbUenovDppaQbEbma8jPUmylqI';
+        const apiKey = 'GEMINI_API_KEY';
         if (!apiKey) {
             throw new Error('Gemini API key not configured');
         }

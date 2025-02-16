@@ -5,6 +5,7 @@ const vscode = require("vscode");
 const node_fetch_1 = require("node-fetch");
 const https = require("https");
 const cheerio = require("cheerio");
+const axios_1 = require("axios");
 class NetworkHandler {
     constructor() {
         this.getLink = () => {
@@ -64,24 +65,37 @@ class NetworkHandler {
     async fetchAndProcessPage(url) {
         try {
             const [urlWithoutHash, hash] = url.split('#');
-            const response = await this.fetchWithRetry(urlWithoutHash);
-            const html = await response.text();
+            let html = '';
+            try {
+                const response = await axios_1.default.post('https://api.worqhat.com/api/ai/v2/web-extract', {
+                    "url": urlWithoutHash,
+                    "includeHTML": true,
+                    "onlyMainContent": false
+                }, {
+                    headers: {
+                        'Authorization': 'Bearer YOUR_WORQHAT_API_KEY',
+                        'Content-Type': 'application/json'
+                    }
+                });
+                html = response.data.data.rawHtml;
+            }
+            catch (e) {
+            }
             const $ = cheerio.load(html);
-            // Clean up content
-            $('.navigation, .footer, .header, .sidebar').remove();
+            // Remove unwanted sections
+            $('.navigation, .footer, .header, .sidebar, img, nav, footer, header, svg').remove();
             // Process code blocks
             $('pre code').each((_, elem) => {
-                const language = $(elem).attr('class')?.replace('language-', '') || 'text';
-                $(elem).parent().addClass(`language-python`);
+                $(elem).parent().addClass('syntax-highlighter');
             });
-            // Add IDs to headings if they don't have them
+            // Add IDs to headings
             $('h1, h2, h3, h4, h5, h6').each((_, elem) => {
                 if (!$(elem).attr('id')) {
                     const id = $(elem).text().toLowerCase().replace(/[^a-z0-9]+/g, '-');
                     $(elem).attr('id', id);
                 }
             });
-            // Handle relative URLs in links and images
+            // Handle relative URLs
             const baseUrl = new URL(urlWithoutHash);
             $('a[href]').each((_, el) => {
                 const href = $(el).attr('href') || '';
@@ -99,7 +113,9 @@ class NetworkHandler {
                     $(el).attr('src', new URL(src, baseUrl).toString());
                 }
             });
-            let content = $('body').html()?.trim();
+            let content = $('.content, article, main').length
+                ? $('.content, article, main').html()?.trim() || ''
+                : $('body').html()?.trim() || '';
             const links = $('a[href]')
                 .map((_, el) => {
                 const href = $(el).attr('href') || '';
@@ -123,7 +139,6 @@ class NetworkHandler {
                 }
             })
                 .filter((value, index, self) => {
-                // Filter out links with empty or invalid text and duplicates
                 let isValidText = '';
                 if (value.text.length == 1) {
                     isValidText = value.href.split("#")[1];
@@ -135,24 +150,12 @@ class NetworkHandler {
                 const isDuplicate = self.findIndex(link => link.href === value.href) !== index;
                 return isValidText && !isDuplicate;
             });
-            //push to linksTuples (text , url) , no duplicate
             links.forEach(link => {
                 const tuple = [link.text, link.href];
                 if (!this.linksTuples.some(([t, h]) => t === tuple[0] && h === tuple[1])) {
                     this.linksTuples.push(tuple);
                 }
             });
-            // If there's a hash in the URL, add a script to scroll to it
-            // if (hash) {
-            //     content = `${content}<script>
-            //         setTimeout(() => {
-            //             const element = document.getElementById('${hash}');
-            //             if (element) {
-            //                 element.scrollIntoView({ behavior: 'smooth' });
-            //             }
-            //         }, 2000);
-            //     </script>`;
-            // }
             return {
                 url,
                 title: $('title').text().trim(),

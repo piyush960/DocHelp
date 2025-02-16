@@ -33,8 +33,8 @@ export class DocumentationManager {
                     items: mainPage.links
                 });
                 this.panel.postMessage({
-                    commands: 'intializeURL',
-                    url: documentationUrl
+                    command: 'intializeURL',
+                    url: documentationUrl,
                 });
 
                 // Queue linked pages for background processing
@@ -109,7 +109,7 @@ export class DocumentationManager {
 
     async search(query: string){
 
-        const searchResult = await axios.post('https://5654-103-81-39-74.ngrok-free.app/intelligent-search',{links : this.networkHandler.getLink(),query : query});
+        const searchResult = await axios.post('YOUR_BACKEND_URL/intelligent-search',{links : this.networkHandler.getLink(),query : query});
         
         if (!(searchResult.status == 200)){
             vscode.window.showErrorMessage('Error From Backend');
@@ -154,7 +154,7 @@ export class DocumentationManager {
               language: 'en'
             },
             headers: {
-              'x-rapidapi-key': '1dc3581a84mshdcf979fd41a22a8p1bcc2ajsnd841021890c1',
+              'x-rapidapi-key': 'YOUR_RAPID_API_KEY',
               'x-rapidapi-host': 'real-time-forums-search.p.rapidapi.com'
             }
           };
