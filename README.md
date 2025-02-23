@@ -1,4 +1,4 @@
-# DocHelp - VSCode Extension for Enhanced Product Documentation
+# DocHelp - VSCode Extension to Enhance Product Documentation
 
 ## 🚀 Overview
 
